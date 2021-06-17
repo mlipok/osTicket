@@ -1114,7 +1114,7 @@ table.dashboard-stats tbody:nth-child(2) td {
     border-right: 1px solid #ccc;
 }
 table.dashboard-stats tbody:nth-child(2) tr:hover {
-    background-color:#FFFFDD;
+    background-color:#B4B4FF;
 }
 table.dashboard-stats tbody:nth-child(2) tr:hover th {
     color:#000;
@@ -1165,10 +1165,10 @@ table.list tbody td {
 
 table.list tbody td { background: #fff; padding: 4px 3px; vertical-align: top; }
 table.list tbody tr:nth-child(2n+1) td { background-color: #f0faff; }
-table.list tbody tr:hover td { background: #ffe; }
-table.list tbody tr:nth-child(2n+1):hover td { background: #ffd; }
+table.list tbody tr:hover td { background: #6496FF; }
+table.list tbody tr:nth-child(2n+1):hover td { background: #6496FF; }
 /* row highlighting on hover + select */
-table.list tbody tr:hover td, table.list tbody tr.highlight td {  background: #FFFFDD; }
+table.list tbody tr:hover td, table.list tbody tr.highlight td {  background: #6496FF; }
 /* disabled highlighting on nohover */
 table.list tbody tr:hover td.nohover, table.list tbody tr.highlight td.nohover {}
 
@@ -3362,7 +3362,7 @@ td.indented {
 }
 
 .thread-preview-entry.note .header {
-    background-color: #ffffdd;
+    background-color: #B4B4FF;
 }
 
 .header .thread-name span:first-child {
@@ -3769,4 +3769,38 @@ img.avatar + img.avatar {
 #select2-cannedResp-results {
     height: auto;
     max-height: 400px !important;
+}
+
+/* Fixes for 100% width style */
+#container {
+    width: auto !important;
+}
+
+#customQ_nav {	
+    width: auto;
+}
+
+table.list {
+    width: auto !important;
+}
+
+.bar .content {	
+    width: auto !important;
+}
+
+#ticket_tabs_container, .tixTitle, .ticket_info, #ticket_tabs {
+    margin: auto;
+    width: 70%;
+}
+
+.redactor-styles {
+    margin: 0 !important;
+}
+
+.thread-entry.note .header {
+    background: #ffdde1 !important;
+}
+
+.thread-entry.avatar.note .header:after {
+    border-right: 7px solid #ffdde1 !important;
 }
