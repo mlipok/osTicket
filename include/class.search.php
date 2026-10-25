@@ -44,7 +44,7 @@ abstract class SearchBackend {
     );
 
     abstract function update($model, $id, $content, $new=false, $attrs=array());
-    abstract function find($query, QuerySet $criteria, $addRelevance=true);
+    abstract function find($query, QuerySet $criteria, $addRelevance=true, $options=array());
 
     static function register($backend=false) {
         $backend = $backend ?: get_called_class();
@@ -55,7 +55,7 @@ abstract class SearchBackend {
         static::$registry[$backend::$id] = $backend;
     }
 
-    function getInstance($id) {
+    static function getInstance($id) {
         if (!isset(self::$registry[$id]))
             return null;
 
@@ -79,9 +79,9 @@ class SearchInterface {
         $this->bootstrap();
     }
 
-    function find($query, QuerySet $criteria, $addRelevance=true) {
+    function find($query, QuerySet $criteria, $addRelevance=true, $options=array()) {
         $query = Format::searchable($query);
-        return $this->backend->find($query, $criteria, $addRelevance);
+        return $this->backend->find($query, $criteria, $addRelevance, $options);
     }
 
     function update($model, $id, $content, $new=false, $attrs=array()) {
@@ -204,7 +204,7 @@ class SearchInterface {
         if (defined('SEARCH_BACKEND'))
             $bk = SearchBackend::getInstance(SEARCH_BACKEND);
 
-        if (!$bk && !($bk = SearchBackend::getInstance('mysql')))
+        if (!isset($bk) && !($bk = SearchBackend::getInstance('mysql')))
             // No backend registered or defined
             return false;
 
@@ -327,7 +327,7 @@ class MysqlSearchBackend extends SearchBackend {
         return implode('', $results);
     }
 
-    function find($query, QuerySet $criteria, $addRelevance=true) {
+    function find($query, QuerySet $criteria, $addRelevance=true, $options=array()) {
         global $thisstaff;
 
         // MySQL usually doesn't handle words shorter than three letters
@@ -338,6 +338,10 @@ class MysqlSearchBackend extends SearchBackend {
         $criteria = clone $criteria;
 
         $mode = ' IN NATURAL LANGUAGE MODE';
+
+        // Allow boolean full-text syntax to be disabled
+        $allow_boolean = !array_key_exists('boolean', $options)
+            || $options['boolean'];
 
         // According to the MySQL full text boolean mode, this grammar is
         // assumed:
@@ -358,8 +362,10 @@ class MysqlSearchBackend extends SearchBackend {
 
         // Require the use of at least one operator and conform to the
         // boolean mode grammar
-        if (preg_match('`(^|\s)["()<>~+-]`u', $query, $T = array())
-            && preg_match("`^{$BOOLEAN}$`u", $query, $T = array())
+        $T = array();
+        if ($allow_boolean
+            && preg_match('`(^|\s)["()<>~+-]`u', $query, $T)
+            && preg_match("`^{$BOOLEAN}$`u", $query, $T)
         ) {
             // If using boolean operators, search in boolean mode. This regex
             // will ensure proper placement of operators, whitespace, and quotes
@@ -369,6 +375,13 @@ class MysqlSearchBackend extends SearchBackend {
         }
         #elseif (count(explode(' ', $query)) == 1)
         #    $mode = ' WITH QUERY EXPANSION';
+
+        // Sanitize query to avoid possible SQL injection via parameter markers
+        // This regex matches one or more colons followed by one or more digits,
+        // and then replaces the match with only the digits (i.e. stripping the colon(s)).
+        $query = preg_replace('/:+(\d+)/', '$1', $query);
+
+        // escape query and using it as search
         $search = 'MATCH (Z1.title, Z1.content) AGAINST ('.db_input($query).$mode.')';
 
         switch ($criteria->model) {
@@ -466,7 +479,7 @@ class MysqlSearchBackend extends SearchBackend {
      * not indexed in the _search table and add it to the index.
      */
     function IndexOldStuff() {
-        $class = get_class();
+        $class = get_class($this);
         $auto_create = function($db_error) use ($class) {
 
             if ($db_error != 1146)
@@ -793,7 +806,7 @@ class SavedQueue extends CustomQueue {
 
         if (!isset($this->_criteria)) {
             $this->getSettings();
-            $this->_criteria = $this->_settings['criteria'] ?: array();
+            $this->_criteria = $this->_settings['criteria'] ?? array();
         }
 
         $criteria = $this->_criteria;
@@ -900,7 +913,10 @@ class SavedQueue extends CustomQueue {
         $query = $this->getQuery();
         if ($agent)
             $query = $agent->applyVisibility($query);
-        $query->limit(false)->offset(false)->order_by(false);
+        $query->filter(Q::any([
+                'ticket_pid__isnull' => true,
+                'flags__hasbit' => Ticket::FLAG_LINKED
+            ]))->limit(false)->offset(false)->order_by(false);
         try {
             return $query->count();
         } catch (Exception $e) {
@@ -940,6 +956,9 @@ class SavedQueue extends CustomQueue {
             ->filter(Q::any(array(
                 'flags__hasbit' => CustomQueue::FLAG_QUEUE,
                 'staff_id' => $agent->getId(),
+            )))
+            ->filter(Q::not(array(
+                'flags__hasbit' => CustomQueue::FLAG_DISABLED,
             )));
 
         if ($criteria && is_array($criteria))
@@ -983,7 +1002,13 @@ class SavedQueue extends CustomQueue {
             }
 
             if ($Q->constraints && !$empty) {
-                $expr = SqlCase::N()->when(new SqlExpr(new Q($Q->constraints)), new SqlField('ticket_id'));
+                $constraints = $Q->constraints;
+                // Add path_constraints to get the correct counts
+                foreach ($Q->path_constraints as $pc) {
+                    if (!empty($pc[0]->constraints))
+                        $constraints[] = $pc[0];
+                }
+                $expr = SqlCase::N()->when(new SqlExpr(new Q($constraints)), new SqlField('ticket_id'));
                 $query->aggregate(array(
                     "q{$queue->id}" => SqlAggregate::COUNT($expr, true)
                 ));
@@ -1096,7 +1121,7 @@ extends SavedSearch {
         return $this->title ?: $this->describeCriteria();
     }
 
-    function load($key) {
+    static function load($key) {
         global $thisstaff;
 
         if (strpos($key, 'adhoc') === 0)
@@ -1150,6 +1175,7 @@ class AdvancedSearchSelectionField extends ChoiceField {
         switch ($method) {
             case 'includes':
             case '!includes':
+                if (!$value) return;
                 $Q = new Q();
                 if (count($value) > 1)
                     $Q->add(array("{$name}__in" => array_keys($value)));

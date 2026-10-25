@@ -60,7 +60,7 @@ elseif ($_POST) {
         $_POST['email'] = $thisclient->getEmail();
     }
 
-    if (!$user_form->isValid(function($f) { return !$f->isVisibleToUsers(); }))
+    if (!$user_form->isValid(function($f) { return $f->isVisibleToUsers(); }))
         $errors['err'] = __('Incomplete client information');
     elseif (!$_POST['backend'] && !$_POST['passwd1'])
         $errors['passwd1'] = __('New password is required');
@@ -125,6 +125,8 @@ elseif ($_POST) {
             }
             break;
         }
+        // Rotate CSRF on successful POST
+        $ost->getCSRF()->rotate();
     }
 
     if ($errors && $user && $user != $thisclient)

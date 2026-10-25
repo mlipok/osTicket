@@ -252,7 +252,7 @@ implements RestrictedAccess, Threadable, Searchable {
         return $this->_children ?: array();
     }
 
-    function getMergeTypeByFlag($flag) {
+    static function getMergeTypeByFlag($flag) {
         if (($flag & self::FLAG_COMBINE_THREADS) != 0)
             return 'combine';
         if (($flag & self::FLAG_SEPARATE_THREADS) != 0)
@@ -279,10 +279,15 @@ implements RestrictedAccess, Threadable, Searchable {
         return false;
     }
 
-    function isParent($flag=false) {
-        if (is_numeric($flag) && ($flag & self::FLAG_PARENT) != 0)
+    function isParent() {
+        if ($this->hasFlag(self::FLAG_PARENT))
             return true;
-        elseif (!is_numeric($flag) && $this->hasFlag(self::FLAG_PARENT))
+
+        return false;
+    }
+
+    static function isParentStatic($flag=false) {
+        if (is_numeric($flag) && ($flag & self::FLAG_PARENT) != 0)
             return true;
 
         return false;
@@ -710,7 +715,7 @@ implements RestrictedAccess, Threadable, Searchable {
         if (!$lock->delete())
             return false;
 
-        $this->lock = null;
+        $this->lock = 0;
         return $this->save();
     }
 
@@ -2490,7 +2495,7 @@ implements RestrictedAccess, Threadable, Searchable {
         return true;
     }
 
-    function manageMerge($tickets) {
+    static function manageMerge($tickets) {
         global $thisstaff;
 
         $permission = ($tickets['title'] && $tickets['title'] == 'link') ? (Ticket::PERM_LINK) : (Ticket::PERM_MERGE);
@@ -2554,7 +2559,7 @@ implements RestrictedAccess, Threadable, Searchable {
         return $ticketObjects;
     }
 
-    function merge($tickets) {
+    static function merge($tickets) {
         $options = $tickets;
         if (!$tickets = self::manageMerge($tickets))
             return false;
@@ -2720,7 +2725,7 @@ implements RestrictedAccess, Threadable, Searchable {
              && ($msg=$tpl->getTransferAlertMsgTemplate())
          ) {
             $msg = $this->replaceVars($msg->asArray(),
-                array('comments' => $note, 'staff' => $thisstaff));
+                array('comments' => $note ?: '', 'staff' => $thisstaff));
             // Recipients
             $recipients = array();
             // Assigned staff or team... if any
@@ -2930,12 +2935,12 @@ implements RestrictedAccess, Threadable, Searchable {
         return true;
     }
 
-    function release($info=array(), &$errors) {
-        if ($info['sid'] && $info['tid'])
+    function release(?array $info=array(), &$errors) {
+        if (isset($info['sid']) && isset($info['tid']))
             return $this->unassign();
-        elseif ($info['sid'] && $this->setStaffId(0))
+        elseif (isset($info['sid']) && $this->setStaffId(0))
             return true;
-        elseif ($info['tid'] && $this->setTeamId(0))
+        elseif (isset($info['tid']) && $this->setTeamId(0))
             return true;
 
         return false;
@@ -3093,7 +3098,7 @@ implements RestrictedAccess, Threadable, Searchable {
             if ($vars['userId']) {
                 $user = User::lookup($vars['userId']);
              } elseif ($vars['header']
-                    && ($hdr= Mail_parse::splitHeaders($vars['header'], true))
+                    && ($hdr= Mail_Parse::splitHeaders($vars['header'], true))
                     && $hdr['From']
                     && ($addr= Mail_Parse::parseAddressList($hdr['From']))) {
                 $info = array(
@@ -3958,7 +3963,7 @@ implements RestrictedAccess, Threadable, Searchable {
         return db_fetch_array(db_query($sql));
     }
 
-    protected function filterTicketData($origin, $vars, $forms, $user=false, $postCreate=false) {
+    protected static function filterTicketData($origin, $vars, $forms, $user=false, $postCreate=false) {
         global $cfg;
 
         // Unset all the filter data field data in case things change
@@ -4031,6 +4036,7 @@ implements RestrictedAccess, Threadable, Searchable {
                             $postCreate->logEvent($description['type'], $description['desc'], $username);
 
                     }
+                    if ($f->stopOnMatch()) break;
                 }
             }
         }
@@ -4231,7 +4237,8 @@ implements RestrictedAccess, Threadable, Searchable {
             $errors += $form->errors();
 
         if ($vars['topicId']) {
-            if (($topic=Topic::lookup($vars['topicId']))
+            if (is_numeric($vars['topicId'])
+                    && ($topic=Topic::lookup((int) $vars['topicId']))
                     && $topic->isActive()) {
                 foreach ($topic_forms as $topic_form) {
                     $TF = $topic_form->getForm($vars);
@@ -4363,7 +4370,7 @@ implements RestrictedAccess, Threadable, Searchable {
             $ticket->email_id = $vars['emailId'];
 
         //Make sure the origin is staff - avoid firebug hack!
-        if ($vars['duedate'] && !strcasecmp($origin,'staff'))
+        if ($vars['duedate'] && in_array(strtolower($origin), ['staff', 'api']))
             $ticket->duedate = date('Y-m-d G:i',
                 Misc::dbtime($vars['duedate']));
 
@@ -4644,7 +4651,6 @@ implements RestrictedAccess, Threadable, Searchable {
         // post response - if any
         $response = null;
         if ($vars['response'] && $role->hasPerm(Ticket::PERM_REPLY)) {
-            $vars['response'] = $ticket->replaceVars($vars['response']);
             // $vars['cannedatachments'] contains the attachments placed on
             // the response form.
             $response = $ticket->postReply($vars, $errors, ($alert &&

@@ -12,6 +12,7 @@ class mysqli {
     function set_charset() {}
     function autocommit() {}
     function rollback() {}
+    function ping() {}
 }
 
 class mysqli_stmt {
@@ -99,7 +100,7 @@ class DateTimeZone {
 }
 
 class DateTimeImmutable {
-    function createFromMutable() {}
+    static function createFromMutable() {}
 }
 
 class Phar {
@@ -120,7 +121,7 @@ class ZipArchive {
 }
 
 class Spyc {
-    function YAMLLoad() {}
+    static function YAMLLoad() {}
 }
 
 class finfo {
@@ -129,8 +130,8 @@ class finfo {
 }
 
 class Locale {
-    function getDisplayName() {}
-    function acceptFromHttp() {}
+    static function getDisplayName() {}
+    static function acceptFromHttp() {}
 }
 class IntlBreakIterator {
     static function createWordInstance() {}
@@ -176,7 +177,7 @@ class IntlDateFormatter {
 }
 
 class ResourceBundle {
-    function getLocales() {}
+    static function getLocales() {}
 }
 
 class NumberFormatter {
@@ -186,6 +187,10 @@ class NumberFormatter {
 class Collator {
     function setStrength() {}
     function compare() {}
+}
+
+class Aws {
+    function createRoute53() {}
 }
 
 class Aws_Route53_Client {
@@ -212,12 +217,12 @@ class Crypt_AES {
 }
 
 class PEAR {
-    function isError() {}
+    static function isError() {}
     function mail() {}
 }
 
 class mail {
-    function factory() {}
+    static function factory() {}
     function connect() {}
     function disconnect() {}
 }
@@ -243,11 +248,38 @@ class HashPassword {
 
 class SplFileObject {
     function fseek() {}
+    function getRealPath() {}
 }
 
 class AuditEntry {
     function getDataById() {}
-    function getTableInfo() {}
+    static function getTableInfo() {}
 }
 
+class Smtp {
+    function _expect() {}
+    function _send() {}
+}
+
+class Imap {
+    function setFlags() {}
+}
+
+class Message {
+    function setSubject() {}
+    function isMultiPart() {}
+}
+
+class MailBoxProtocolTrait {
+    function sendRequest() {}
+}
+
+class MailBoxStorageTrait {
+    function selectFolder() {}
+    function countMessages() {}
+    function getRawHeader() {}
+    function getRawContent() {}
+    function moveMessage() {}
+    function removeMessage() {}
+}
 ?>

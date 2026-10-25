@@ -59,10 +59,17 @@ class TasksAjaxAPI extends AjaxController {
     }
 
     function triggerThreadAction($task_id, $thread_id, $action) {
+        global $thisstaff;
+
+        if (!($task = Task::lookup($task_id))
+                || !$task->checkStaffPerm($thisstaff))
+            Http::response(404, 'No such task thread entry');
+
         $thread = ThreadEntry::lookup($thread_id);
         if (!$thread)
             Http::response(404, 'No such task thread entry');
-        if ($thread->getThread()->getObjectId() != $task_id)
+        if ($thread->getThread()->getObjectType() != 'A'
+                || $thread->getThread()->getObjectId() != $task_id)
             Http::response(404, 'No such task thread entry');
 
         $valid = false;
@@ -269,7 +276,7 @@ class TasksAjaxAPI extends AjaxController {
                         break;
                     default:
                         $clean =  $field->getClean();
-                        $clean = is_array($clean) ? implode($clean, ',') :
+                        $clean = is_array($clean) ? implode(',', $clean) :
                             (string) $clean;
                         if (strlen($clean) > 200)
                              $clean = Format::truncate($clean, 200);
@@ -451,7 +458,7 @@ class TasksAjaxAPI extends AjaxController {
         case 'transfer':
             $inc = 'transfer.tmpl.php';
             $info[':action'] = '#tasks/mass/transfer';
-            $info[':title'] = sprintf('Transfer %s',
+            $info[':title'] = sprintf(__('Transfer %s'),
                     _N('selected task', 'selected tasks', $count));
             $form = TransferForm::instantiate($_POST);
             $form->hideDisabled();

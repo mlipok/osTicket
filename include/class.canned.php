@@ -261,7 +261,7 @@ extends VerySimpleModel {
         return $responses;
     }
 
-    function responsesByDeptId($deptId, $explicit=false) {
+    static function responsesByDeptId($deptId, $explicit=false) {
         return self::getCannedResponses($deptId, $explicit);
     }
 
@@ -310,6 +310,12 @@ extends VerySimpleModel {
                .' '.__('Internal error occurred');
 
         return true;
+    }
+
+    function staffCanAccess($staff) {
+        if (!$staff instanceof Staff)
+            return false;
+        return (!$this->dept || (($role = $staff->getRole($this->dept)) && $role->hasPerm(Canned::PERM_MANAGE)));
     }
 }
 RolePermission::register( /* @trans */ 'Knowledgebase', Canned::getPermissions());
